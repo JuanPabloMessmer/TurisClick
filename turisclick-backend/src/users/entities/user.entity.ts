@@ -9,15 +9,18 @@ import {
   ManyToOne,
   OneToMany,
 } from 'typeorm';
-
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('increment')
   id: number;
 
-  @Column({ length: 75, unique: true })
-  username: string;
+  @Column({ length: 100 })
+  firstName: string;
+
+  @Column({ length: 100 })
+  lastName: string;
 
   @Column({ length: 255, unique: true })
   email: string;
@@ -25,14 +28,19 @@ export class User {
   @Column({ length: 255 })
   password: string;
 
-  @Column({ length: 255, nullable: true })
-  preferences: string;
+  @Column({ type: 'simple-array', nullable: true })
+  preferences: string[];
 
   @Column({ length: 255, nullable: true })
   profile_image: string;
 
-  @ManyToOne(() => Role, (role) => role.users, { onDelete: 'SET NULL' })
-  role: Role;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
+
 
   @OneToMany(() => Review, (review) => review.user)
   reviews: Review[];
