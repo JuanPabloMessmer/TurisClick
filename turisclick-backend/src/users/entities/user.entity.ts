@@ -10,6 +10,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
+import { Attraction } from '../../attractions/entities/attraction.entity';
 
 @Entity('users')
 export class User {
@@ -41,6 +42,9 @@ export class User {
   })
   role: UserRole;
 
+  @Column({ default: false })
+  isHost: boolean;
+
 
   @OneToMany(() => Review, (review) => review.user)
   reviews: Review[];
@@ -50,4 +54,7 @@ export class User {
 
   @OneToMany(() => Reservation, (reservation) => reservation.user)
   reservations: Reservation[];
+
+  @OneToMany(() => Attraction, (attraction) => attraction.admin)
+  attractions: Attraction[];
 }

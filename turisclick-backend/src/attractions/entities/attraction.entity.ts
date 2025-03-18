@@ -11,6 +11,8 @@ import {
     ManyToOne,
     OneToMany,
   } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { AttractionStatus } from '../enums/attraction-status.enums';
 
   
   @Entity('attractions')
@@ -21,13 +23,13 @@ import {
     @Column({ length: 80 })
     name: string;
   
-    @Column({ length: 80 })
+    @Column({ length: 255 })
     description: string;
   
-    @Column({ length: 80 })
+    @Column({ type: 'time' })
     opening_time: string;
   
-    @Column({ length: 80 })
+    @Column({ type: 'time' })
     closing_time: string;
   
     @Column({ type: 'float' })
@@ -56,5 +58,13 @@ import {
   
     @OneToMany(() => Reservation, (reservation) => reservation.attraction)
     reservations: Reservation[];
+    @ManyToOne(() => User, (user) => user.attractions, { nullable: true, onDelete: 'SET NULL' })
+    admin: User;
+    @Column({
+      type: 'enum',
+      enum: AttractionStatus,
+      default: AttractionStatus.PENDING,
+    })
+    status: AttractionStatus;
   }
   

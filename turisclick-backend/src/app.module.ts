@@ -18,10 +18,11 @@ import { FavoriteModule } from './favorite/favorite.module';
 import { PriceHistoryModule } from './price_history/price_history.module';
 import { AdminModule } from './admin/admin.module';
 import { JwtStrategy } from './jwt.strategy';
+import { DepartmentsModule } from './departments/departments.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }), // Cargar variables de entorno de .env
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST ,
@@ -47,6 +48,7 @@ import { JwtStrategy } from './jwt.strategy';
     FavoriteModule,
     PriceHistoryModule,
     AdminModule,
+    DepartmentsModule,
   ],
   controllers: [AppController],
   providers: [AppService,

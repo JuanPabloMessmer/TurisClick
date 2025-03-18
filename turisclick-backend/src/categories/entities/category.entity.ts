@@ -9,7 +9,7 @@ export class Category {
   @Column({ length: 40 })
   name: string;
 
-  @Column({ length: 40 })
+  @Column({ length: 255 })
   description: string;
 
   @OneToMany(() => Attraction, (attraction) => attraction.category)

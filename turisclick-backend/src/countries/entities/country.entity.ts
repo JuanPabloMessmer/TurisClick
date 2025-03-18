@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { City } from 'src/cities/entities/city.entity';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Department } from '../../departments/entities/department.entity';
 
 @Entity('countries')
 export class Country {
@@ -10,6 +11,6 @@ export class Country {
   @Column({ length: 50 })
   name: string;
 
-  @OneToMany(() => City, (city) => city.country)
-  cities: City[];
+  @OneToMany(() => Department, (department) => department.country)
+  departments: Department[];
 }

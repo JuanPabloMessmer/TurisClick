@@ -1,19 +1,14 @@
-import { Attraction } from 'src/attractions/entities/attraction.entity';
-import { Country } from 'src/countries/entities/country.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
-
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Department } from '../../departments/entities/department.entity';
 
 @Entity('cities')
 export class City {
-  @PrimaryGeneratedColumn('increment')
+  @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 50 })
+  @Column({ length: 100 })
   name: string;
 
-  @ManyToOne(() => Country, (country) => country.cities, { onDelete: 'CASCADE' })
-  country: Country;
-
-  @OneToMany(() => Attraction, (attraction) => attraction.city)
-  attractions: Attraction[];
+  @ManyToOne(() => Department, (department) => department.cities, { onDelete: 'CASCADE' })
+  department: Department;
 }

@@ -19,16 +19,63 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
-  }
-
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
   updateProfile(@Req() req: Request, @Body() updateUserDto: UpdateUserDto) {
-    const userId = (req.user as any).userId; 
-    return this.usersService.update(userId, updateUserDto);
+    try {
+      // Obtener el ID del usuario de manera segura
+      const userId = (req.user as any).userId;
+      
+      // Validar que el ID del usuario es un número válido
+      if (!userId || isNaN(userId)) {
+        throw new Error(`ID de usuario inválido: ${userId}`);
+      }
+      
+      // Convertir explícitamente a número
+      return this.usersService.update(Number(userId), updateUserDto);
+    } catch (error) {
+      console.error('Error en updateProfile:', error);
+      throw error;
+    }
+  }
+  
+  @UseGuards(JwtAuthGuard)
+  @Patch('host-status')
+  updateHostStatus(@Req() req: Request, @Body() body: { enabled?: boolean }) {
+    try {
+      console.log('Actualizando estado de host del usuario autenticado');
+      
+      // Obtener el ID directamente del token JWT
+      const userId = (req.user as any).userId;
+      console.log('ID de usuario extraído del token:', userId, typeof userId);
+      
+      // Validar que el ID del usuario es un número válido
+      if (!userId || isNaN(Number(userId))) {
+        throw new Error(`ID de usuario inválido en el token: ${userId}`);
+      }
+      
+      // Convertir a número para asegurar compatibilidad
+      const numericId = Number(userId);
+      
+      // Si no se especifica enabled, asumimos true
+      const enabled = body.enabled !== undefined ? body.enabled : true;
+      console.log(`Actualizando isHost a ${enabled} para usuario con ID: ${numericId}`);
+      
+      // Activar o desactivar el estado de host según el valor de 'enabled'
+      if (enabled) {
+        return this.usersService.makeHost(numericId);
+      } else {
+        return this.usersService.update(numericId, { isHost: false } as UpdateUserDto);
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado de host:', error);
+      throw error;
+    }
+  }
+  
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(+id);
   }
   
   @Patch(':id')
