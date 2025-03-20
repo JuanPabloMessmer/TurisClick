@@ -1,19 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreatePriceHistoryDto } from './dto/create-price_history.dto';
 import { UpdatePriceHistoryDto } from './dto/update-price_history.dto';
-import { PriceHistory } from './entities/price_history.entity';
+import { PriceChangeType, PriceHistory } from './entities/price_history.entity';
+import { Sector } from '../sectors/entities/sector.entity';
 
 @Injectable()
 export class PriceHistoryService {
   constructor(
     @InjectRepository(PriceHistory)
-    private priceHistoryRepository: Repository<PriceHistory>
+    private priceHistoryRepository: Repository<PriceHistory>,
+    @InjectRepository(Sector)
+    private sectorRepository: Repository<Sector>
   ) {}
 
   async create(createPriceHistoryDto: CreatePriceHistoryDto): Promise<PriceHistory> {
     console.log('Creando historial de precios con datos:', createPriceHistoryDto);
+    
+    // Validar que si el tipo es SECTOR, se proporcione un sectorId
+    if (createPriceHistoryDto.changeType === PriceChangeType.SECTOR && !createPriceHistoryDto.sectorId) {
+      throw new BadRequestException('Para cambios de precio en sectores, se debe proporcionar un sectorId');
+    }
     
     // Asegurarse de que changedById sea un número si existe
     if (createPriceHistoryDto.changedById === undefined) {
@@ -35,7 +43,7 @@ export class PriceHistoryService {
 
   async findAll(): Promise<PriceHistory[]> {
     return await this.priceHistoryRepository.find({
-      relations: ['attraction', 'changedBy'],
+      relations: ['attraction', 'sector', 'changedBy'],
       order: { changedAt: 'DESC' }
     });
   }
@@ -43,7 +51,15 @@ export class PriceHistoryService {
   async findAllByAttractionId(attractionId: number): Promise<PriceHistory[]> {
     return await this.priceHistoryRepository.find({
       where: { attractionId },
-      relations: ['changedBy'],
+      relations: ['sector', 'changedBy'],
+      order: { changedAt: 'DESC' }
+    });
+  }
+
+  async findAllBySectorId(sectorId: number): Promise<PriceHistory[]> {
+    return await this.priceHistoryRepository.find({
+      where: { sectorId, changeType: PriceChangeType.SECTOR },
+      relations: ['attraction', 'changedBy'],
       order: { changedAt: 'DESC' }
     });
   }
@@ -51,7 +67,7 @@ export class PriceHistoryService {
   async findOne(id: number): Promise<PriceHistory> {
     const priceHistory = await this.priceHistoryRepository.findOne({
       where: { id },
-      relations: ['attraction', 'changedBy']
+      relations: ['attraction', 'sector', 'changedBy']
     });
     
     if (!priceHistory) {
@@ -64,8 +80,10 @@ export class PriceHistoryService {
   async update(id: number, updatePriceHistoryDto: UpdatePriceHistoryDto): Promise<PriceHistory> {
     const priceHistory = await this.findOne(id);
     
-    // Actualizar solo los campos proporcionados
-    Object.assign(priceHistory, updatePriceHistoryDto);
+    // Solo permitimos actualizar la razón del cambio
+    if (updatePriceHistoryDto.reason) {
+      priceHistory.reason = updatePriceHistoryDto.reason;
+    }
     
     return await this.priceHistoryRepository.save(priceHistory);
   }

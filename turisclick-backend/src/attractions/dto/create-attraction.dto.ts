@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional, IsEnum, IsUrl, IsArray, Min, Max, IsNotEmptyObject, ArrayMinSize } from 'class-validator';
 import { AttractionStatus } from '../enums/attraction-status.enums';
 
 export class CreateAttractionDto {
@@ -18,29 +18,53 @@ export class CreateAttractionDto {
   @IsString()
   closing_time: string;
 
-  @IsNotEmpty()
+  /**
+   * @deprecated Se recomienda definir precios por sector en lugar de un precio general para la atracción
+   */
+  @IsOptional()
   @IsNumber()
-  price: number;
+  price?: number;
 
   @IsNotEmpty()
   @IsString()
   location: string;
-
+  
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude: number;
+  
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude: number;
+  
   @IsOptional()
-  @IsString()
-  images?: string;
+  @IsUrl()
+  googleMapsUrl?: string;
 
   @IsNotEmpty()
   @IsNumber()
   cityId: number;
 
-  @IsNotEmpty()
-  @IsNumber()
-  categoryId: number;
-
   @IsOptional()
   @IsNumber()
-  adminId?: number;
+  categoryId?: number;
+
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @ArrayMinSize(1)
+  categoryIds: number[];
+
+  @IsNotEmpty()
+  @IsNumber()
+  adminId: number;
+
+  @IsArray()
+  @IsOptional()
+  images?: string[];
 
   @IsOptional()
   @IsEnum(AttractionStatus)

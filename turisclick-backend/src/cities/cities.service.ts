@@ -1,26 +1,64 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateCityDto } from './dto/create-city.dto';
 import { UpdateCityDto } from './dto/update-city.dto';
+import { City } from './entities/city.entity';
 
 @Injectable()
 export class CitiesService {
+  constructor(
+    @InjectRepository(City)
+    private cityRepository: Repository<City>,
+  ) {}
+
   create(createCityDto: CreateCityDto) {
-    return 'This action adds a new city';
+    const city = this.cityRepository.create(createCityDto);
+    return this.cityRepository.save(city);
   }
 
   findAll() {
-    return `This action returns all cities`;
+    return this.cityRepository.find({ relations: ['department'] });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} city`;
+  async findByDepartment(departmentId: number) {
+    try {
+      const cities = await this.cityRepository.find({
+        where: { department: { id: departmentId } },
+        relations: ['department'],
+      });
+      
+      return {
+        status: 'success',
+        message: `Ciudades del departamento ${departmentId} obtenidas exitosamente`,
+        data: cities,
+      };
+    } catch (error) {
+      throw new Error(`Error al buscar ciudades por departamento: ${error.message}`);
+    }
   }
 
-  update(id: number, updateCityDto: UpdateCityDto) {
-    return `This action updates a #${id} city`;
+  async findOne(id: number) {
+    const city = await this.cityRepository.findOne({
+      where: { id },
+      relations: ['department'],
+    });
+    
+    if (!city) {
+      throw new NotFoundException(`City with ID ${id} not found`);
+    }
+    
+    return city;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} city`;
+  async update(id: number, updateCityDto: UpdateCityDto) {
+    const city = await this.findOne(id);
+    this.cityRepository.merge(city, updateCityDto);
+    return this.cityRepository.save(city);
+  }
+
+  async remove(id: number) {
+    const city = await this.findOne(id);
+    return this.cityRepository.remove(city);
   }
 }

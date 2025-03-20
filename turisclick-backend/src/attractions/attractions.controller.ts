@@ -9,17 +9,72 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Req
+  Req,
+  UseInterceptors,
+  UploadedFiles,
+  HttpException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AttractionsService } from './attractions.service';
 import { CreateAttractionDto } from './dto/create-attraction.dto';
 import { UpdateAttractionDto } from './dto/update-attraction.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('attractions')
 export class AttractionsController {
   constructor(private readonly attractionsService: AttractionsService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post('upload-images')
+  @UseInterceptors(FilesInterceptor('images', 10, {
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    }
+  }))
+  @HttpCode(HttpStatus.OK)
+  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    try {
+      if (!files || files.length === 0) {
+        throw new HttpException(
+          'No se proporcionaron archivos',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Validar cada archivo
+      files.forEach(file => {
+        console.log('Procesando archivo:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          buffer: file.buffer ? 'Buffer presente' : 'Buffer ausente',
+          keys: Object.keys(file)
+        });
+
+        // Validar tipo de archivo de manera más flexible
+        if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+          throw new HttpException(
+            `Tipo de archivo no válido: ${file.mimetype}`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      });
+
+      console.log('Iniciando subida de imágenes...');
+      const imageUrls = await this.attractionsService.uploadImages(files);
+      console.log('Imágenes subidas exitosamente:', imageUrls);
+
+      return {
+        status: 'success',
+        message: 'Imágenes subidas exitosamente',
+        data: imageUrls,
+      };
+    } catch (error) {
+      console.error('Error en uploadImages controller:', error);
+      throw error;
+    }
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post()

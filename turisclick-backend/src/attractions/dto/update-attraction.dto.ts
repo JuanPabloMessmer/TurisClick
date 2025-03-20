@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsNumber, IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsNumber, IsString, IsOptional, IsEnum, IsUrl, IsArray } from 'class-validator';
 import { CreateAttractionDto } from './create-attraction.dto';
 import { AttractionStatus } from '../enums/attraction-status.enums';
 
@@ -29,8 +29,20 @@ export class UpdateAttractionDto extends PartialType(CreateAttractionDto) {
   location?: string;
 
   @IsOptional()
-  @IsString()
-  images?: string;
+  @IsNumber()
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @IsOptional()
+  @IsUrl()
+  googleMapsUrl?: string;
+
+  @IsOptional()
+  @IsEnum(AttractionStatus)
+  status?: AttractionStatus;
 
   @IsOptional()
   @IsNumber()
@@ -41,10 +53,15 @@ export class UpdateAttractionDto extends PartialType(CreateAttractionDto) {
   categoryId?: number;
 
   @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  categoryIds?: number[];
+
+  @IsOptional()
   @IsNumber()
   adminId?: number;
 
   @IsOptional()
-  @IsEnum(AttractionStatus)
-  status?: AttractionStatus;
+  @IsArray()
+  images?: string[];
 }

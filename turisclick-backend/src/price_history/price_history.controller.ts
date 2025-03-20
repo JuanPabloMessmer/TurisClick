@@ -54,6 +54,17 @@ export class PriceHistoryController {
     };
   }
 
+  @Get('sector/:sectorId')
+  @HttpCode(HttpStatus.OK)
+  async findAllBySectorId(@Param('sectorId') sectorId: string) {
+    const priceHistories = await this.priceHistoryService.findAllBySectorId(+sectorId);
+    return {
+      status: 'success',
+      message: `Historiales de precio para el sector ${sectorId} obtenidos exitosamente`,
+      data: priceHistories
+    };
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {

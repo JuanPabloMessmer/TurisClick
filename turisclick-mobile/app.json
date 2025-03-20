@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "TurisClick",
+    "slug": "turisclick-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.turisclick.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBbdEmtB5lYk0I231EHZ0LVRUK13p8oJ7M"
+      },
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "UIStatusBarHidden": false,
+        "UIStatusBarStyle": "UIStatusBarStyleDarkContent"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.turisclick.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBbdEmtB5lYk0I231EHZ0LVRUK13p8oJ7M"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permite a TurisClick acceder a tu ubicación para mostrar atracciones cercanas y calcular rutas."
+        }
+      ]
+    ],
+    "extra": {
+      "googlePlacesApiKey": "AIzaSyBbdEmtB5lYk0I231EHZ0LVRUK13p8oJ7M"
+    }
+  }
+}

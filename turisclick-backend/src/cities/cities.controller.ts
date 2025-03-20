@@ -17,6 +17,11 @@ export class CitiesController {
     return this.citiesService.findAll();
   }
 
+  @Get('department/:departmentId')
+  findByDepartment(@Param('departmentId') departmentId: string) {
+    return this.citiesService.findByDepartment(+departmentId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.citiesService.findOne(+id);
