@@ -17,6 +17,10 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
-  @IsUrl()
+  @IsUrl({ require_protocol: false, require_valid_protocol: false })
   profile_image?: string;
+
+  // Este campo puede ser añadido o eliminado por el administrador
+  @IsOptional()
+  isHost?: boolean;
 }

@@ -179,4 +179,114 @@ export class TicketService {
     const ticket = await this.findOne(id);
     await this.ticketRepository.remove(ticket);
   }
+
+  /**
+   * Crea múltiples tickets asociados a una transacción exitosa
+   * @param transactionId ID de la transacción SCRUM PAY
+   * @param userId ID del usuario que realiza la compra
+   * @param ticketItems Items de tickets a generar
+   * @param notes Notas adicionales
+   * @returns Array de tickets generados
+   */
+  async createTicketsFromTransaction(
+    transactionId: string,
+    userId: number,
+    ticketItems: Array<{
+      attractionId: number;
+      sectorId: number;
+      quantity: number;
+      price?: number;
+      validFor: Date;
+    }>,
+    notes?: string
+  ): Promise<Ticket[]> {
+    const createdTickets: Ticket[] = [];
+    
+    try {
+      // Verificar si el usuario existe
+      const user = await this.userRepository.findOne({
+        where: { id: userId }
+      });
+      
+      if (!user) {
+        throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+      }
+      
+      // Procesar cada item de ticket
+      for (const item of ticketItems) {
+        // Verificar si existe la atracción
+        const attraction = await this.attractionRepository.findOne({
+          where: { id: item.attractionId }
+        });
+        
+        if (!attraction) {
+          throw new NotFoundException(`Atracción con ID ${item.attractionId} no encontrada`);
+        }
+        
+        // Verificar si existe el sector
+        const sector = await this.sectorRepository.findOne({
+          where: { id: item.sectorId, attractionId: item.attractionId }
+        });
+        
+        if (!sector) {
+          throw new NotFoundException(`Sector con ID ${item.sectorId} no encontrado para la atracción ${item.attractionId}`);
+        }
+        
+        // Verificar disponibilidad en el sector
+        const capacityAvailable = await this.sectorsService.checkCapacityAvailable(
+          item.sectorId, 
+          item.validFor
+        );
+        
+        if (capacityAvailable < item.quantity) {
+          throw new BadRequestException(
+            `No hay suficiente capacidad disponible en el sector ${sector.name}. Disponible: ${capacityAvailable}, Solicitado: ${item.quantity}`
+          );
+        }
+        
+        // Usar el precio del sector si no se proporciona uno
+        const price = item.price || sector.price;
+        
+        // Crear los tickets según la cantidad solicitada
+        for (let i = 0; i < item.quantity; i++) {
+          // Generar código único para cada ticket
+          const code = `${transactionId.substring(0, 4)}-${uuidv4().substring(0, 8).toUpperCase()}`;
+          
+          const ticket = this.ticketRepository.create({
+            code,
+            price,
+            validFor: item.validFor,
+            status: TicketStatus.ACTIVE,
+            attraction,
+            attractionId: item.attractionId,
+            sector,
+            sectorId: item.sectorId,
+            buyer: user,
+            buyerId: userId,
+            notes: notes || `Compra realizada mediante transacción ${transactionId}`
+          });
+          
+          const savedTicket = await this.ticketRepository.save(ticket);
+          createdTickets.push(savedTicket);
+        }
+      }
+      
+      return createdTickets;
+    } catch (error) {
+      // Si ya se guardaron algunos tickets y hay un error, intentar revertir
+      if (createdTickets.length > 0) {
+        console.error('Error al crear tickets, revirtiendo tickets ya creados:', error);
+        try {
+          await Promise.all(createdTickets.map(ticket => this.ticketRepository.remove(ticket)));
+        } catch (rollbackError) {
+          console.error('Error al revertir tickets:', rollbackError);
+        }
+      }
+      
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Error al crear los tickets: ${error.message}`);
+    }
+  }
 }

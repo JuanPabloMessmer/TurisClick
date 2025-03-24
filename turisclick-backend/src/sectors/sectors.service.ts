@@ -7,6 +7,7 @@ import { Sector } from './entities/sector.entity';
 import { Attraction } from '../attractions/entities/attraction.entity';
 import { PriceHistoryService } from '../price_history/price_history.service';
 import { PriceChangeType } from '../price_history/entities/price_history.entity';
+import { Ticket, TicketStatus } from '../ticket/entities/ticket.entity';
 
 @Injectable()
 export class SectorsService {
@@ -15,6 +16,8 @@ export class SectorsService {
     private sectorRepository: Repository<Sector>,
     @InjectRepository(Attraction)
     private attractionRepository: Repository<Attraction>,
+    @InjectRepository(Ticket)
+    private ticketRepository: Repository<Ticket>,
     private priceHistoryService: PriceHistoryService
   ) {}
 
@@ -108,5 +111,51 @@ export class SectorsService {
   async remove(id: number): Promise<void> {
     const sector = await this.findOne(id);
     await this.sectorRepository.remove(sector);
+  }
+
+  /**
+   * Verifica la capacidad disponible en un sector para una fecha determinada
+   * @param sectorId ID del sector
+   * @param date Fecha para la que se quiere verificar la capacidad
+   * @returns Cantidad de espacios disponibles
+   */
+  async checkCapacityAvailable(sectorId: number, date: Date): Promise<number> {
+    try {
+      // Obtener el sector para verificar su capacidad máxima
+      const sector = await this.sectorRepository.findOne({
+        where: { id: sectorId }
+      });
+      
+      if (!sector) {
+        throw new NotFoundException(`Sector con ID ${sectorId} no encontrado`);
+      }
+      
+      if (!sector.maxCapacity) {
+        // Si no hay capacidad máxima definida, consideramos que hay capacidad ilimitada
+        return Number.MAX_SAFE_INTEGER;
+      }
+      
+      // Convertir la fecha a un formato sin tiempo (solo fecha)
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      // Obtener los tickets existentes para esta fecha y sector
+      const existingTickets = await this.ticketRepository.count({
+        where: {
+          sectorId: sectorId,
+          validFor: targetDate,
+          status: TicketStatus.ACTIVE // Solo contar tickets activos
+        }
+      });
+      
+      // Calcular capacidad disponible
+      const availableCapacity = sector.maxCapacity - existingTickets;
+      return Math.max(0, availableCapacity); // No permitir valores negativos
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(`Error al verificar capacidad disponible: ${error.message}`);
+    }
   }
 }

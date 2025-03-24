@@ -29,7 +29,12 @@ export class User {
   @Column({ length: 255 })
   password: string;
 
-  @Column({ type: 'simple-array', nullable: true })
+  @Column({
+    type: 'text',
+    array: true,
+    nullable: true,
+    default: []
+  })
   preferences: string[];
 
   @Column({ length: 255, nullable: true })
