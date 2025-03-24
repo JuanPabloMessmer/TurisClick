@@ -37,6 +37,7 @@ import { createAttraction, uploadImages, CreateAttractionData } from '../api/att
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { getCitiesByDepartment } from '../api/citiesApi';
 import { getDepartments } from '../api/departmentsApi';
+import { updateHostStatus } from '../api/usersApi';
 
 type CreateAttractionScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -107,7 +108,7 @@ const handleCategorySelection = (
 
 const CreateAttractionScreen = () => {
   const navigation = useNavigation<CreateAttractionScreenNavigationProp>();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<AttractionFormData>(initialFormData);
   const [isLoading, setIsLoading] = useState(false);
@@ -473,7 +474,6 @@ const CreateAttractionScreen = () => {
           return true;
         }
       }
-      // Si es URL corta, intentar expandirla
       if (shortUrlRegex.test(url)) {
         console.log('URL corta detectada, intentando expandir...');
         try {
@@ -582,47 +582,95 @@ const CreateAttractionScreen = () => {
       
       console.log('Enviando categorías:', selectedCategories);
       
-      // Creamos la atracción usando la función API que ya hace el mapeo correcto
-      const newAttraction = await createAttraction(attractionData);
-      console.log('Atracción creada:', newAttraction);
+      let attractionCreated = false;
+      let attractionId: number | null = null;
       
-      // Si hay imágenes para subir y la atracción se creó correctamente
-      if (formData.images && formData.images.length > 0 && newAttraction?.data?.id) {
+      try {
+        // Creamos la atracción usando la función API que ya hace el mapeo correcto
+        const newAttraction = await createAttraction(attractionData);
+        console.log('Atracción creada:', newAttraction);
+        attractionCreated = true;
+        attractionId = newAttraction?.data?.id || null;
+        
+        // Si hay imágenes para subir y la atracción se creó correctamente
+        if (formData.images && formData.images.length > 0 && attractionId) {
+          try {
+            console.log('Preparando para subir imágenes...');
+            const formDataImg = new FormData();
+            
+            // Añadir cada imagen al FormData
+            formData.images.forEach((image, index) => {
+              console.log(`Añadiendo imagen ${index + 1}:`, image);
+              formDataImg.append('images', {
+                uri: image.uri,
+                name: image.name || `image-${index}.jpg`,
+                type: image.type || 'image/jpeg',
+              } as any);
+            });
+            
+            // Subir las imágenes
+            console.log('Subiendo imágenes para atracción ID:', attractionId);
+            const uploadResponse = await uploadImages(attractionId, formDataImg);
+            console.log('Respuesta de subida de imágenes:', uploadResponse);
+          } catch (uploadError) {
+            console.error('Error al subir imágenes:', uploadError);
+            // No mostrar error crítico, ya que la atracción ya se creó
+            Alert.alert(
+              'Advertencia', 
+              'La atracción se creó correctamente, pero hubo un problema al subir las imágenes.'
+            );
+          }
+        }
+      } catch (attractionError) {
+        console.error('Error al crear la atracción:', attractionError);
+        attractionCreated = false;
+        Alert.alert('Error', 'No se pudo crear la atracción. Por favor, intenta nuevamente.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Solo intentar actualizar estado de host si la atracción se creó correctamente
+      let hostUpdateSuccess = false;
+      if (attractionCreated) {
         try {
-          console.log('Preparando para subir imágenes...');
-          const formDataImg = new FormData();
+          const hostResponse = await updateHostStatus();
+          console.log('Respuesta de actualización a host:', hostResponse);
+          hostUpdateSuccess = hostResponse?.status === 'success';
           
-          // Añadir cada imagen al FormData
-          formData.images.forEach((image, index) => {
-            console.log(`Añadiendo imagen ${index + 1}:`, image);
-            formDataImg.append('images', {
-              uri: image.uri,
-              name: image.name || `image-${index}.jpg`,
-              type: image.type || 'image/jpeg',
-            } as any);
-          });
-          
-          // Subir las imágenes
-          console.log('Subiendo imágenes para atracción ID:', newAttraction.data.id);
-          const uploadResponse = await uploadImages(newAttraction.data.id, formDataImg);
-          console.log('Respuesta de subida de imágenes:', uploadResponse);
-        } catch (uploadError) {
-          console.error('Error al subir imágenes:', uploadError);
-          // No mostrar error crítico, ya que la atracción ya se creó
-          Alert.alert(
-            'Atracción creada',
-            'La atracción se creó correctamente, pero hubo un problema al subir las imágenes.'
-          );
+          // Si la actualización de host fue exitosa, actualizar el contexto del usuario
+          if (hostUpdateSuccess && user) {
+            console.log('Actualizando contexto de usuario con isHost=true');
+            // Actualizar el contexto de usuario para reflejar el cambio inmediatamente
+            updateProfile({ ...user, isHost: true });
+          }
+        } catch (hostError) {
+          console.error('Error al actualizar estado de host:', hostError);
+          hostUpdateSuccess = false;
         }
       }
       
       setIsLoading(false);
-      Alert.alert('¡Atracción creada!', 'Tu atracción ha sido creada exitosamente.');
-      navigation.goBack(); // Volvemos a la pantalla anterior después de crear
+      
+      // Mensaje de éxito basado en los resultados
+      if (attractionCreated) {
+        if (hostUpdateSuccess) {
+          Alert.alert(
+            '¡Atracción creada!', 
+            'Tu atracción ha sido creada exitosamente y ahora eres un host.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        } else {
+          Alert.alert(
+            '¡Atracción creada!', 
+            'Tu atracción ha sido creada exitosamente, pero hubo un problema al actualizar tu estado de host. Intenta actualizar la aplicación o contacta a soporte.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        }
+      }
     } catch (error: any) {
-      console.error('Error al crear la atracción:', error);
+      console.error('Error general en handleSubmit:', error);
       setIsLoading(false);
-      Alert.alert('Error', error.response?.data?.message || 'Ocurrió un error al crear la atracción. Intenta nuevamente.');
+      Alert.alert('Error', 'Ocurrió un error inesperado. Por favor, intenta nuevamente.');
     }
   };
 
@@ -682,25 +730,7 @@ const CreateAttractionScreen = () => {
                     <ActivityIndicator size="small" color="#2196F3" />
                 ) : (
                     <View style={styles.categoriesContainer}>
-                      {categories.map((category) => (
-                          <TouchableOpacity
-                              key={category.id}
-                              style={[
-                                styles.categoryButton,
-                                selectedCategories.includes(category.id) && styles.categoryButtonSelected,
-                              ]}
-                              onPress={() => handleCategorySelection(category.id, selectedCategories, setSelectedCategories)}
-                          >
-                            <Text
-                                style={[
-                                  styles.categoryButtonText,
-                                  selectedCategories.includes(category.id) && styles.categoryButtonTextSelected,
-                                ]}
-                            >
-                              {category.name}
-                            </Text>
-                          </TouchableOpacity>
-                      ))}
+                      {categories.map(category => renderCategoryItem({ item: category }))}
                     </View>
                 )}
                 {errors.categories ? <Text style={styles.errorText}>{errors.categories}</Text> : (errors.categoryIds ? <Text style={styles.errorText}>{errors.categoryIds}</Text> : null)}
@@ -949,6 +979,39 @@ const CreateAttractionScreen = () => {
         longitudeDelta: 0.005,
       });
     }
+  };
+
+  // Añadir esta función para renderizar cada categoría
+  const renderCategoryItem = ({ item }: { item: Category }) => {
+    const isCategorySelected = selectedCategories.includes(item.id);
+    
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.categoryButton,
+          isCategorySelected && styles.categoryButtonSelected,
+        ]}
+        onPress={() => {
+          if (isCategorySelected) {
+            // Deseleccionar categoría
+            setSelectedCategories(selectedCategories.filter(id => id !== item.id));
+          } else {
+            // Seleccionar categoría
+            setSelectedCategories([...selectedCategories, item.id]);
+          }
+        }}
+      >
+        <Text
+          style={[
+            styles.categoryButtonText,
+            isCategorySelected && styles.categoryButtonTextSelected,
+          ]}
+        >
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   return (

@@ -89,18 +89,24 @@ const LoginScreen = () => {
     }
     
     setLoading(true);
+    console.log('Intentando iniciar sesión con:', formData.email);
     
     try {
+      console.log('Antes de llamar a login...');
       const success = await login(formData.email, formData.password);
+      console.log('Resultado de login:', success);
       
       if (!success) {
+        console.log('Login falló en la UI');
         setErrors(prev => ({
           ...prev,
           general: 'Credenciales incorrectas o error en el servidor'
         }));
+      } else {
+        console.log('Login exitoso en la UI');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Login error completo:', JSON.stringify(error));
       
       setErrors(prev => ({
         ...prev,
@@ -121,7 +127,7 @@ const LoginScreen = () => {
           <View style={styles.formContainer}>
             <View style={styles.logoContainer}>
               <Image 
-                source={require('../../assets/icon.png')} 
+                source={require('../../assets/TURISCLICK.png')} 
                 style={styles.logo}
                 resizeMode="contain"
               />

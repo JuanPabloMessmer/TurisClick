@@ -35,7 +35,7 @@ export const getAttractionById = async (id: string) => {
   try {
     const response = await apiClient.get<ApiResponse<any>>(`/attractions/${id}`);
     console.log('Attraction details API response:', response.data);
-    return response.data.data;
+    return response.data;
   } catch (error) {
     console.error(`Error fetching attraction with ID ${id}:`, error);
     return null;

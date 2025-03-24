@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -7,15 +7,20 @@ import {
   TouchableOpacity, 
   ScrollView, 
   ActivityIndicator, 
-  Alert 
+  Alert,
+  FlatList 
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { getCategories, Category } from '../api/categoriesApi';
+import { Ionicons } from '@expo/vector-icons';
 
 const SignupScreen = () => {
   const navigation = useNavigation();
   const { register } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -23,6 +28,7 @@ const SignupScreen = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    preferences: [] as string[],
   });
   
   const [errors, setErrors] = useState({
@@ -31,7 +37,25 @@ const SignupScreen = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    preferences: '',
   });
+
+  // Cargar categorías disponibles
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const categoriesData = await getCategories(true);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error al obtener categorías:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({
@@ -44,6 +68,35 @@ const SignupScreen = () => {
       setErrors(prev => ({
         ...prev,
         [name]: ''
+      }));
+    }
+  };
+
+  const togglePreference = (categoryId: string) => {
+    setFormData(prev => {
+      // Verificar si la categoría ya está seleccionada
+      const isSelected = prev.preferences.includes(categoryId);
+      let updatedPreferences;
+
+      if (isSelected) {
+        // Eliminar de las preferencias
+        updatedPreferences = prev.preferences.filter(id => id !== categoryId);
+      } else {
+        // Agregar a las preferencias
+        updatedPreferences = [...prev.preferences, categoryId];
+      }
+
+      return {
+        ...prev,
+        preferences: updatedPreferences
+      };
+    });
+
+    // Limpiar error de preferencias si hay
+    if (errors.preferences) {
+      setErrors(prev => ({
+        ...prev,
+        preferences: ''
       }));
     }
   };
@@ -89,6 +142,12 @@ const SignupScreen = () => {
       isValid = false;
     }
     
+    // Preferences validation
+    if (formData.preferences.length === 0) {
+      newErrors.preferences = 'Selecciona al menos una preferencia';
+      isValid = false;
+    }
+    
     setErrors(newErrors);
     return isValid;
   };
@@ -103,11 +162,19 @@ const SignupScreen = () => {
     try {
       const { confirmPassword, ...signupData } = formData;
       
+      // Verificar las preferencias antes de enviar
+      console.log('Preferencias antes de enviar al registro:', signupData.preferences);
+      
+      // Asegurarnos de que las preferencias sean strings y no números
+      const preferencesArray = signupData.preferences.map(pref => pref.toString());
+      console.log('Preferencias convertidas a string:', preferencesArray);
+      
       const success = await register(
         signupData.firstName,
         signupData.lastName,
         signupData.email,
-        signupData.password
+        signupData.password,
+        preferencesArray  // Enviamos el array de strings
       );
       
       if (success) {
@@ -130,6 +197,31 @@ const SignupScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Renderizar cada categoría como un chip seleccionable
+  const renderCategoryItem = ({ item }: { item: Category }) => {
+    const isSelected = formData.preferences.includes(item.id.toString());
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.categoryChip,
+          isSelected && styles.selectedCategoryChip
+        ]}
+        onPress={() => togglePreference(item.id.toString())}
+      >
+        <Text style={[
+          styles.categoryChipText,
+          isSelected && styles.selectedCategoryChipText
+        ]}>
+          {item.name}
+        </Text>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={16} color="#ffffff" style={styles.checkIcon} />
+        )}
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -197,22 +289,42 @@ const SignupScreen = () => {
           {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
         </View>
         
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Preferencias</Text>
+          <Text style={styles.sublabel}>Selecciona las categorías que te interesan:</Text>
+          
+          {loadingCategories ? (
+            <ActivityIndicator size="small" color="#FF385C" style={styles.categoryLoader} />
+          ) : (
+            <>
+              <View style={styles.categoriesContainer}>
+                {categories.map(category => (
+                  <React.Fragment key={`category-${category.id}`}>
+                    {renderCategoryItem({ item: category })}
+                  </React.Fragment>
+                ))}
+              </View>
+              {errors.preferences ? <Text style={styles.errorText}>{errors.preferences}</Text> : null}
+            </>
+          )}
+        </View>
+        
         <TouchableOpacity 
-          style={styles.button} 
+          style={[styles.button, loading && styles.disabledButton]} 
           onPress={handleSignup}
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Registrarse</Text>
           )}
         </TouchableOpacity>
         
-        <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>¿Ya tienes una cuenta?</Text>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>¿Ya tienes una cuenta?</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginLink}>Iniciar sesión</Text>
+            <Text style={styles.footerLink}>Inicia sesión</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -223,38 +335,41 @@ const SignupScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#fff',
   },
   formContainer: {
     padding: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
     color: '#333',
+  },
+  sublabel: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
   },
   inputError: {
@@ -262,35 +377,66 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#ff3b30',
-    fontSize: 14,
+    fontSize: 12,
     marginTop: 4,
   },
   button: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 14,
+    backgroundColor: '#FF385C',
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  loginContainer: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 24,
   },
-  loginText: {
-    fontSize: 16,
+  footerText: {
+    color: '#666',
+    marginRight: 4,
+  },
+  footerLink: {
+    color: '#FF385C',
+    fontWeight: 'bold',
+  },
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    margin: 4,
+  },
+  selectedCategoryChip: {
+    backgroundColor: '#FF385C',
+  },
+  categoryChipText: {
+    fontSize: 14,
     color: '#666',
   },
-  loginLink: {
-    fontSize: 16,
-    color: '#2196F3',
-    fontWeight: 'bold',
+  selectedCategoryChipText: {
+    color: '#fff',
+  },
+  checkIcon: {
     marginLeft: 4,
+  },
+  categoryLoader: {
+    marginVertical: 16,
   },
 });
 

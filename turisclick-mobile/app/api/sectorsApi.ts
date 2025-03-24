@@ -10,7 +10,7 @@ export interface Sector {
   id: number;
   name: string;
   description?: string;
-  price: number;
+  price: number | string;
   maxCapacity?: number;
   isActive: boolean;
   attractionId: number;
@@ -19,11 +19,20 @@ export interface Sector {
 // Get all sectors for an attraction
 export const getSectorsByAttraction = async (attractionId: number) => {
   try {
+    console.log(`Fetching sectors for attraction ${attractionId}...`);
     const response = await apiClient.get<ApiResponse<Sector[]>>(`/sectors/attraction/${attractionId}`);
-    console.log('Sectors for attraction API response:', response.data);
+    console.log('Sectors data received (raw):', JSON.stringify(response.data, null, 2));
     
-    if (response.data && response.data.status === 'success') {
-      return response.data.data;
+    if (response.data && response.data.status === 'success' && Array.isArray(response.data.data)) {
+      // Verificar el tipo de datos de los precios
+      const sectors = response.data.data;
+      console.log(`Received ${sectors.length} sectors. Checking price types...`);
+      
+      sectors.forEach((sector, index) => {
+        console.log(`Sector ${index} (${sector.name}) - Price: ${sector.price}, Type: ${typeof sector.price}`);
+      });
+      
+      return sectors;
     } else {
       console.error('Unexpected response format:', response.data);
       return [];

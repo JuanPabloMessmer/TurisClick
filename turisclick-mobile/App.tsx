@@ -2,6 +2,7 @@ import React from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './app/context/AuthContext';
+import { CartProvider } from './app/context/CartContext';
 import AppNavigator from './app/navigation/AppNavigator';
 import { hasNotch, getStatusBarHeight } from './app/utils/dimensions';
 
@@ -14,7 +15,9 @@ export default function App() {
         translucent={true} 
       />
       <AuthProvider>
-        <AppNavigator />
+        <CartProvider>
+          <AppNavigator />
+        </CartProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

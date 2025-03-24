@@ -24,7 +24,9 @@ import {
   scale, 
   hasNotch 
 } from '../utils/dimensions';
-
+import { addToFavorites, removeFromFavorites, checkIsFavorite } from '../api/favoritesApi';
+import { useAuth } from '../context/AuthContext';
+import { getSectorsByAttraction, Sector } from '../api/sectorsApi';
 // Get the server base URL from the API client
 const API_BASE_URL = API_URL || 'http://192.168.0.14:3000';
 
@@ -63,7 +65,10 @@ const HomeScreen = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Record<number, boolean>>({});
+  const [attractionPrices, setAttractionPrices] = useState<Record<number, {min: number, max: number}>>({});
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     fetchAttractions();
@@ -79,6 +84,14 @@ const HomeScreen = () => {
       if (response && response.status === 'success' && Array.isArray(response.data)) {
         setAttractions(response.data);
         setError(null);
+        
+        // Verificar estado de favoritos para cada atracción
+        if (isAuthenticated) {
+          checkFavoritesStatus(response.data);
+        }
+        
+        // Cargar precios de sectores para cada atracción
+        loadSectorPrices(response.data);
       } else {
         console.log('Invalid response format:', response);
         setError('Invalid response format from API');
@@ -92,10 +105,80 @@ const HomeScreen = () => {
     }
   };
 
+  const checkFavoritesStatus = async (attractionsList: AttractionType[]) => {
+    try {
+      const favoritesStatus: Record<number, boolean> = {};
+      
+      // Verificar cada atracción individualmente
+      for (const attraction of attractionsList) {
+        if (attraction.id) {
+          const isFavorite = await checkIsFavorite(attraction.id);
+          favoritesStatus[attraction.id] = isFavorite;
+        }
+      }
+      
+      setFavorites(favoritesStatus);
+    } catch (error) {
+      console.error('Error checking favorites status:', error);
+    }
+  };
+
+  const toggleFavorite = async (attractionId: number) => {
+    if (!isAuthenticated) {
+      navigation.navigate('Main' as any, { screen: 'Auth', params: { screen: 'Login' } });
+      return;
+    }
+    
+    try {
+      const isFavorite = favorites[attractionId];
+      
+      if (isFavorite) {
+        await removeFromFavorites(attractionId);
+      } else {
+        await addToFavorites(attractionId);
+      }
+      
+      // Actualizar el estado local
+      setFavorites(prev => ({
+        ...prev,
+        [attractionId]: !isFavorite
+      }));
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     setError(null);
     fetchAttractions();
+  };
+
+  // Función para cargar los precios de los sectores de cada atracción
+  const loadSectorPrices = async (attractionsList: AttractionType[]) => {
+    try {
+      const pricesData: Record<number, {min: number, max: number}> = {};
+      
+      // Para cada atracción, obtener sus sectores
+      for (const attraction of attractionsList) {
+        if (attraction.id) {
+          const sectors = await getSectorsByAttraction(attraction.id);
+          
+          if (sectors && sectors.length > 0) {
+            // Encontrar precio mínimo y máximo
+            const prices = sectors.map(sector => sector.price);
+            pricesData[attraction.id] = {
+              min: Math.min(...prices),
+              max: Math.max(...prices)
+            };
+          }
+        }
+      }
+      
+      setAttractionPrices(pricesData);
+    } catch (error) {
+      console.error('Error cargando precios de sectores:', error);
+    }
   };
 
   const renderItem = ({ item }: { item: AttractionType }) => {
@@ -120,6 +203,11 @@ const HomeScreen = () => {
       return fullUrl;
     };
 
+    const isFavorite = item.id ? favorites[item.id] : false;
+    
+    // Obtener rango de precios para esta atracción
+    const priceRange = item.id ? attractionPrices[item.id] : null;
+
     return (
       <TouchableOpacity 
         style={styles.card}
@@ -138,8 +226,18 @@ const HomeScreen = () => {
             style={styles.image} 
             resizeMode="cover" 
           />
-          <TouchableOpacity style={styles.favoriteButton}>
-            <Ionicons name="heart-outline" size={24} color="white" />
+          <TouchableOpacity 
+            style={[
+              styles.favoriteButton,
+              isFavorite ? styles.favoritedButton : {}
+            ]}
+            onPress={() => item.id && toggleFavorite(item.id)}
+          >
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={24} 
+              color={isFavorite ? "#FF5A5F" : "white"} 
+            />
           </TouchableOpacity>
         </View>
         
@@ -148,7 +246,11 @@ const HomeScreen = () => {
           <Text style={styles.location} numberOfLines={1}>{item.location}</Text>
           <Text style={styles.hours}>{item.opening_time} - {item.closing_time}</Text>
           <Text style={styles.price}>
-            {item.price ? `$${item.price}` : 'Ver sectores y precios'}
+            {priceRange 
+              ? priceRange.min === priceRange.max 
+                ? `${priceRange.min} bs` 
+                : `${priceRange.min} bs - ${priceRange.max} bs`
+              : 'Precios no disponibles'}
           </Text>
         </View>
       </TouchableOpacity>
@@ -368,6 +470,9 @@ const styles = StyleSheet.create({
     fontSize: RFValue(14),
     color: '#666',
     textAlign: 'center',
+  },
+  favoritedButton: {
+    backgroundColor: 'rgba(255,255,255,0.8)',
   },
 });
 

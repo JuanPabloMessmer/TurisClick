@@ -10,15 +10,22 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  StatusBar,
 } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { getSectorsByAttraction, createSector, updateSector, deleteSector, Sector } from '../api/sectorsApi';
 import { getAttractionById } from '../api/attractionsApi';
-import { spacing, RFValue } from '../utils/dimensions';
+import { spacing, RFValue, hasNotch, getStatusBarHeight } from '../utils/dimensions';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Definir tipo para parámetros de ruta
+type SectorsRouteParams = {
+  attractionId: number;
+};
 
 const SectorsScreen = () => {
-  const route = useRoute();
+  const route = useRoute<RouteProp<Record<string, SectorsRouteParams>, string>>();
   const navigation = useNavigation();
   const { attractionId } = route.params || {};
   
@@ -40,7 +47,7 @@ const SectorsScreen = () => {
     if (attractionId) {
       fetchData();
     } else {
-      setError('No attraction ID provided');
+      setError('No se proporcionó ID de atracción');
       setLoading(false);
     }
   }, [attractionId]);
@@ -51,11 +58,11 @@ const SectorsScreen = () => {
       setError(null);
       
       // Fetch attraction details
-      const attractionData = await getAttractionById(attractionId);
-      if (attractionData) {
-        setAttraction(attractionData);
+      const attractionData = await getAttractionById(attractionId.toString());
+      if (attractionData && attractionData.data) {
+        setAttraction(attractionData.data);
       } else {
-        setError('Could not load attraction details');
+        setError('No se pudieron cargar los detalles de la atracción');
         setLoading(false);
         return;
       }
@@ -65,7 +72,7 @@ const SectorsScreen = () => {
       setSectors(sectorsData);
     } catch (err) {
       console.error('Error fetching data:', err);
-      setError('Error loading data');
+      setError('Error al cargar los datos');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -117,7 +124,7 @@ const SectorsScreen = () => {
         attractionId: Number(attractionId),
       };
 
-      let updatedSector;
+      let updatedSector: Sector;
 
       if (editingSector) {
         // Update existing sector
@@ -179,13 +186,24 @@ const SectorsScreen = () => {
     <View style={styles.sectorCard}>
       <View style={styles.sectorHeader}>
         <Text style={styles.sectorName}>{item.name}</Text>
-        <Text style={styles.sectorPrice}>${item.price.toFixed(2)}</Text>
+        <View style={styles.priceBadge}>
+          <Text style={styles.sectorPrice}>Bs {typeof item.price === 'number' 
+            ? item.price.toFixed(2) 
+            : (typeof item.price === 'string' ? parseFloat(item.price).toFixed(2) : '0.00')}</Text>
+        </View>
       </View>
       
-      {item.description && <Text style={styles.sectorDescription}>{item.description}</Text>}
+      {item.description && (
+        <Text style={styles.sectorDescription}>{item.description}</Text>
+      )}
       
       {item.maxCapacity && (
-        <Text style={styles.sectorCapacity}>Capacidad máxima: {item.maxCapacity}</Text>
+        <View style={styles.capacityContainer}>
+          <Ionicons name="people-outline" size={16} color="#666" />
+          <Text style={styles.sectorCapacity}>
+            Capacidad: {item.maxCapacity} personas
+          </Text>
+        </View>
       )}
       
       <View style={styles.sectorActions}>
@@ -193,7 +211,7 @@ const SectorsScreen = () => {
           style={[styles.actionButton, styles.editButton]}
           onPress={() => openEditSectorModal(item)}
         >
-          <Ionicons name="pencil" size={16} color="white" />
+          <Ionicons name="pencil-outline" size={16} color="white" />
           <Text style={styles.actionButtonText}>Editar</Text>
         </TouchableOpacity>
         
@@ -201,7 +219,7 @@ const SectorsScreen = () => {
           style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDeleteSector(item)}
         >
-          <Ionicons name="trash" size={16} color="white" />
+          <Ionicons name="trash-outline" size={16} color="white" />
           <Text style={styles.actionButtonText}>Eliminar</Text>
         </TouchableOpacity>
       </View>
@@ -210,137 +228,234 @@ const SectorsScreen = () => {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FF5A5F" />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#FF5A5F" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.buttonText}>Volver</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.buttonText}>Volver</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sectores</Text>
-        <View style={{ width: 24 }} />
-      </View>
-      
-      {attraction && (
-        <View style={styles.attractionInfo}>
-          <Text style={styles.attractionName}>{attraction.name}</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Sectores y Precios</Text>
+          <View style={{ width: 24 }} />
         </View>
-      )}
-      
-      <FlatList
-        data={sectors}
-        renderItem={renderSectorItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="ticket-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No hay sectores definidos</Text>
-            <Text style={styles.emptySubText}>
-              Crea sectores para definir diferentes precios
+        
+        {attraction && (
+          <View style={styles.attractionInfo}>
+            <Text style={styles.attractionName}>{attraction.name}</Text>
+            <Text style={styles.attractionLocation}>
+              <Ionicons name="location-outline" size={16} color="#666" />
+              {' '}{attraction.location || 'Ubicación no especificada'}
             </Text>
           </View>
         )}
-      />
-      
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={openAddSectorModal}
-      >
-        <Ionicons name="add" size={24} color="white" />
-      </TouchableOpacity>
-      
-      {/* Sector Edit/Add Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingSector ? 'Editar Sector' : 'Nuevo Sector'}
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.inputLabel}>Nombre del Sector *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={sectorName}
-                onChangeText={setSectorName}
-                placeholder="Ej: Adulto, Niño, Estudiante"
-              />
-              
-              <Text style={styles.inputLabel}>Descripción</Text>
-              <TextInput
-                style={[styles.textInput, styles.textAreaInput]}
-                value={sectorDescription}
-                onChangeText={setSectorDescription}
-                placeholder="Descripción opcional del sector"
-                multiline
-                numberOfLines={3}
-              />
-              
-              <Text style={styles.inputLabel}>Precio *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={sectorPrice}
-                onChangeText={setSectorPrice}
-                placeholder="Precio en Bs."
-                keyboardType="decimal-pad"
-              />
-              
-              <Text style={styles.inputLabel}>Capacidad Máxima</Text>
-              <TextInput
-                style={styles.textInput}
-                value={sectorCapacity}
-                onChangeText={setSectorCapacity}
-                placeholder="Capacidad máxima (opcional)"
-                keyboardType="number-pad"
-              />
-              
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSaveSector}
-              >
-                <Text style={styles.saveButtonText}>
-                  {editingSector ? 'Actualizar Sector' : 'Crear Sector'}
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+        
+        {sectors.length === 0 ? (
+          // Vista cuando no hay sectores - sin scroll
+          <View style={styles.emptyFullContainer}>
+            <View style={styles.emptyTopSpace} />
+            <Ionicons name="ticket-outline" size={64} color="#f0f0f0" />
+            <Text style={styles.emptyText}>No hay sectores definidos</Text>
+            <Text style={styles.emptySubText}>
+              Los sectores permiten definir diferentes tipos de entrada con precios específicos
+            </Text>
+            <View style={styles.emptyBottomSpace} />
+            <TouchableOpacity 
+              style={styles.emptyAddButton}
+              onPress={openAddSectorModal}
+            >
+              <Text style={styles.emptyAddButtonText}>Añadir Sector</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
-    </View>
+        ) : (
+          // Vista cuando hay sectores - con scroll solo si hay más de 3
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.contentContainer,
+              // Si hay 3 o menos sectores, expandir para llenar el espacio
+              sectors.length <= 3 && styles.expandContent
+            ]}
+            scrollEnabled={sectors.length > 3} // Solo habilitar scroll cuando hay más de 3 sectores
+          >
+            <View style={styles.sectorsGrid}>
+              {sectors.map(item => (
+                <View key={item.id.toString()} style={styles.sectorCard}>
+                  <View style={styles.sectorHeader}>
+                    <Text style={styles.sectorName}>{item.name}</Text>
+                    <View style={styles.priceBadge}>
+                      <Text style={styles.sectorPrice}>Bs {typeof item.price === 'number' 
+                        ? item.price.toFixed(2) 
+                        : (typeof item.price === 'string' ? parseFloat(item.price).toFixed(2) : '0.00')}</Text>
+                    </View>
+                  </View>
+                  
+                  {item.description && (
+                    <Text style={styles.sectorDescription}>{item.description}</Text>
+                  )}
+                  
+                  {item.maxCapacity && (
+                    <View style={styles.capacityContainer}>
+                      <Ionicons name="people-outline" size={16} color="#666" />
+                      <Text style={styles.sectorCapacity}>
+                        Capacidad: {item.maxCapacity} personas
+                      </Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.sectorActions}>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.editButton]}
+                      onPress={() => openEditSectorModal(item)}
+                    >
+                      <Ionicons name="pencil-outline" size={16} color="white" />
+                      <Text style={styles.actionButtonText}>Editar</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => handleDeleteSector(item)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="white" />
+                      <Text style={styles.actionButtonText}>Eliminar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
+        
+        {sectors.length > 0 && (
+          <TouchableOpacity
+            style={styles.floatingButton}
+            onPress={openAddSectorModal}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        )}
+        
+        {/* Sector Edit/Add Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingSector ? 'Editar Sector' : 'Añadir Nuevo Sector'}
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => setModalVisible(false)}
+                  style={styles.closeModalButton}
+                >
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                style={styles.modalBody}
+                contentContainerStyle={styles.modalBodyContent}
+              >
+                <View style={styles.formContainer}>
+                  <Text style={styles.inputLabel}>Nombre del Sector *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={sectorName}
+                    onChangeText={setSectorName}
+                    placeholder="Ej: Adulto, Niño, VIP, Estudiante"
+                    placeholderTextColor="#aaa"
+                  />
+                  
+                  <Text style={styles.inputLabel}>Descripción</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textAreaInput]}
+                    value={sectorDescription}
+                    onChangeText={setSectorDescription}
+                    placeholder="Describe brevemente este sector o tipo de entrada"
+                    placeholderTextColor="#aaa"
+                    multiline
+                    numberOfLines={3}
+                  />
+                  
+                  <Text style={styles.inputLabel}>Precio *</Text>
+                  <View style={styles.priceInputContainer}>
+                    <Text style={styles.currencySymbol}>Bs</Text>
+                    <TextInput
+                      style={styles.priceInput}
+                      value={sectorPrice}
+                      onChangeText={setSectorPrice}
+                      placeholder="0.00"
+                      placeholderTextColor="#aaa"
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                  
+                  <Text style={styles.inputLabel}>Capacidad Máxima</Text>
+                  <View style={styles.capacityInputContainer}>
+                    <TextInput
+                      style={styles.capacityInput}
+                      value={sectorCapacity}
+                      onChangeText={setSectorCapacity}
+                      placeholder="Sin límite"
+                      placeholderTextColor="#aaa"
+                      keyboardType="number-pad"
+                    />
+                    <Text style={styles.capacityLabel}>personas</Text>
+                  </View>
+                </View>
+              </ScrollView>
+              
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSaveSector}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {editingSector ? 'Actualizar Sector' : 'Crear Sector'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -356,69 +471,104 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: '#fff',
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: RFValue(18),
     fontWeight: 'bold',
     color: '#333',
   },
   attractionInfo: {
-    padding: 16,
-    backgroundColor: '#f9f9f9',
+    padding: 20,
+    backgroundColor: '#f8f8f8',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   attractionName: {
-    fontSize: 20,
+    fontSize: RFValue(20),
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 4,
   },
-  listContainer: {
+  attractionLocation: {
+    fontSize: RFValue(14),
+    color: '#666',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
     padding: 16,
-    paddingBottom: 80, // Space for the floating button
+    paddingBottom: 80, // Espacio para el botón flotante
+  },
+  expandContent: {
+    flexGrow: 1,
+  },
+  sectorsGrid: {
+    flexDirection: 'column',
+    gap: 16,
   },
   sectorCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   sectorHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   sectorName: {
-    fontSize: 16,
+    fontSize: RFValue(16),
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
+  },
+  priceBadge: {
+    backgroundColor: '#F5F8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E6F2',
   },
   sectorPrice: {
-    fontSize: 16,
+    fontSize: RFValue(16),
     fontWeight: 'bold',
     color: '#FF5A5F',
   },
   sectorDescription: {
-    fontSize: 14,
+    fontSize: RFValue(14),
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  capacityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectorCapacity: {
-    fontSize: 14,
+    fontSize: RFValue(14),
     color: '#666',
-    marginBottom: 8,
+    marginLeft: 6,
   },
   sectorActions: {
     flexDirection: 'row',
@@ -428,38 +578,61 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginLeft: 8,
   },
   actionButtonText: {
     color: 'white',
     marginLeft: 4,
-    fontSize: 12,
+    fontSize: RFValue(12),
+    fontWeight: '500',
   },
   editButton: {
     backgroundColor: '#4CAF50',
   },
   deleteButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#FF5A5F',
   },
-  emptyContainer: {
+  emptyFullContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    marginTop: 32,
+    padding: 20,
+  },
+  emptyTopSpace: {
+    flex: 0.2, // 20% del espacio superior
+  },
+  emptyBottomSpace: {
+    flex: 0.5, // 50% del espacio inferior (empuja el botón hacia abajo)
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: RFValue(18),
     fontWeight: 'bold',
     color: '#333',
     marginTop: 16,
   },
   emptySubText: {
-    fontSize: 14,
+    fontSize: RFValue(14),
     color: '#666',
     textAlign: 'center',
     marginTop: 8,
+    marginBottom: 16,
+    lineHeight: 20,
+    paddingHorizontal: 20,
+  },
+  emptyAddButton: {
+    backgroundColor: '#FF5A5F',
+    paddingHorizontal: 30,
+    paddingVertical: 16,
+    borderRadius: 24,
+    marginBottom: 50, // Espacio fijo en la parte inferior
+  },
+  emptyAddButtonText: {
+    color: 'white',
+    fontSize: RFValue(14),
+    fontWeight: 'bold',
   },
   floatingButton: {
     position: 'absolute',
@@ -485,9 +658,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '85%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -503,47 +676,100 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: RFValue(18),
     fontWeight: 'bold',
     color: '#333',
+  },
+  closeModalButton: {
+    padding: 4,
   },
   modalBody: {
+    padding: 20,
+    paddingBottom: 0, // Quitar padding inferior porque ahora tendremos un footer
+  },
+  modalBodyContent: {
+    paddingBottom: 20,
+  },
+  formContainer: {
+    flex: 1,
+  },
+  modalFooter: {
     padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: RFValue(14),
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
+    borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
-    fontSize: 16,
+    marginBottom: 20,
+    fontSize: RFValue(15),
+    backgroundColor: '#f9f9f9',
   },
   textAreaInput: {
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: 'top',
+  },
+  priceInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+    marginBottom: 20,
+  },
+  currencySymbol: {
+    paddingHorizontal: 12,
+    fontSize: RFValue(16),
+    color: '#666',
+  },
+  priceInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: RFValue(15),
+  },
+  capacityInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  capacityInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: RFValue(15),
+    backgroundColor: '#f9f9f9',
+    marginRight: 10,
+  },
+  capacityLabel: {
+    fontSize: RFValue(15),
+    color: '#666',
   },
   saveButton: {
     backgroundColor: '#FF5A5F',
     padding: 16,
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
   },
   saveButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: RFValue(16),
     fontWeight: 'bold',
   },
   errorText: {
-    color: 'red',
-    fontSize: 16,
+    color: '#FF5A5F',
+    fontSize: RFValue(16),
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -555,7 +781,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: RFValue(16),
     fontWeight: 'bold',
   },
 });
