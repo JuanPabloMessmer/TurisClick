@@ -1,10 +1,13 @@
 import { Controller, Post, Body, HttpCode, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import {SkipThrottle, Throttle} from '@nestjs/throttler';
+
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @SkipThrottle()
   @Post('signup')
   @HttpCode(201)
   async signup(
@@ -17,7 +20,7 @@ export class AuthController {
         email: signupDto.email,
         preferences: signupDto.preferences
       });
-      
+
       // Asegurarnos de que preferences sea un array
       let preferences = signupDto.preferences || [];
       if (preferences && !Array.isArray(preferences)) {
@@ -29,7 +32,7 @@ export class AuthController {
           preferences = preferences ? [preferences.toString()] : [];
         }
       }
-      
+
       const userData = await this.authService.signup(
         signupDto.firstName,
         signupDto.lastName,
@@ -37,13 +40,13 @@ export class AuthController {
         signupDto.password,
         preferences
       );
-      
+
       console.log('Usuario creado:', userData);
-      
+
       return {
         status: 'success',
         message: 'Usuario creado exitosamente',
-        data: userData, 
+        data: userData,
       };
     } catch (error) {
       console.error('Error en el proceso de signup:', error);
@@ -59,7 +62,7 @@ export class AuthController {
     return {
       status: 'success',
       message: 'Login exitoso',
-      data: token, 
+      data: token,
     };
   }
 }

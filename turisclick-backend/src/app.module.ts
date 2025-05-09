@@ -1,8 +1,14 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { JwtStrategy } from './jwt.strategy';
+
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AttractionsModule } from './attractions/attractions.module';
@@ -17,7 +23,6 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { FavoriteModule } from './favorite/favorite.module';
 import { PriceHistoryModule } from './price_history/price_history.module';
 import { AdminModule } from './admin/admin.module';
-import { JwtStrategy } from './jwt.strategy';
 import { DepartmentsModule } from './departments/departments.module';
 import { SectorsModule } from './sectors/sectors.module';
 import { TicketModule } from './ticket/ticket.module';
@@ -31,17 +36,24 @@ import { TicketModule } from './ticket/ticket.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
+      useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: +configService.get('DB_PORT'),
-        username: configService.get('DB_USER'),
-        password: configService.get('DB_PASS'),
-        database: configService.get('DB_NAME'),
+        host: config.get('DB_HOST'),
+        port: +config.get('DB_PORT'),
+        username: config.get('DB_USER'),
+        password: config.get('DB_PASS'),
+        database: config.get('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: seconds(1800),
+        limit: 5,
+
+      },
+    ]),
     AuthModule,
     UsersModule,
     AttractionsModule,
@@ -61,8 +73,13 @@ import { TicketModule } from './ticket/ticket.module';
     TicketModule,
   ],
   controllers: [AppController],
-  providers: [AppService,
-    JwtStrategy
+  providers: [
+    AppService,
+    JwtStrategy,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}
